@@ -70,7 +70,7 @@ class Cursor(object):
         # MySQLdb's argument escaping rules are completely at odds with the
         # DB-API spec, unfortunately the project this codebase was originally
         # written for uses those features, so we emulate them.
-        if isinstance(args, collections.Sequence) and not isinstance(args, basestring):
+        if isinstance(args, collections.Sequence) and not isinstance(args, str):
             return tuple([
                 self._get_encoder(arg)(self.connection, arg)
                 for arg in args
@@ -78,7 +78,7 @@ class Cursor(object):
         elif isinstance(args, collections.Mapping):
             return dict([
                 (key, self._get_encoder(value)(self.connection, value))
-                for key, value in args.iteritems()
+                for key, value in args.items()
             ])
         else:
             return self._get_encoder(args)(self.connection, args)
@@ -102,10 +102,10 @@ class Cursor(object):
         self._check_closed()
         self._clear()
 
-        if isinstance(query, unicode):
-            query = query.encode(self.connection.character_set_name())
         if args is not None:
             query %= self._escape_data(args)
+        if isinstance(query, str):
+            query = query.encode('utf-8', 'surrogateescape')
         self._query(query)
 
     def executemany(self, query, args):
@@ -114,8 +114,6 @@ class Cursor(object):
         if not args:
             return
 
-        if isinstance(query, unicode):
-            query = query.encode(self.connection.character_set_name())
         matched = INSERT_VALUES.match(query)
         if not matched:
             rowcount = 0
@@ -130,7 +128,7 @@ class Cursor(object):
                 for arg in args
             ]
             multirow_query = start + ",\n".join(sql_params) + end
-            self._query(multirow_query)
+            self._query(multirow_query.encode('utf-8', 'surrogateescape'))
         return self.rowcount
 
     def callproc(self, procname, args=()):
@@ -138,9 +136,9 @@ class Cursor(object):
         self._clear()
 
         query = "SELECT %s(%s)" % (procname, ",".join(["%s"] * len(args)))
-        if isinstance(query, unicode):
-            query = query.encode(self.connection.character_set_name())
         query %= self._escape_data(args)
+        if isinstance(query, str):
+            query = query.encode('utf-8', 'surrogateescape')
         self._query(query)
         return args
 
@@ -174,8 +172,8 @@ class Cursor(object):
 class DictCursor(Cursor):
     def _make_row(self, row):
         return dict(
-            (description[0], value)
-            for description, value in itertools.izip(self._result.description, row)
+            (description[0].decode('utf-8'), value)
+            for description, value in zip(self._result.description, row)
         )
 
     def fetchall(self):
@@ -210,7 +208,7 @@ class Result(object):
         self.rows = None
         self.row_index = 0
         # TOOD: this is a hack, find a better way.
-        if self.cursor._executed.upper().startswith("CREATE"):
+        if self.cursor._executed.upper().startswith(b"CREATE"):
             cursor.rowcount = -1
         else:
             cursor.rowcount = libmysql.c.mysql_affected_rows(cursor.connection._db)
@@ -253,7 +251,7 @@ class Result(object):
         n = libmysql.c.mysql_num_fields(self._result)
         fields = libmysql.c.mysql_fetch_fields(self._result)
         d = [None] * n
-        for i in xrange(n):
+        for i in range(n):
             f = fields[i]
             d[i] = Description(
                 ctypes.string_at(f.name, f.name_length),
@@ -296,7 +294,7 @@ class Result(object):
     def fetchmany(self, size):
         self._check_rows("fetchmany")
         if self._result:
-            for i in xrange(size - (len(self.rows) - self.row_index)):
+            for i in range(size - (len(self.rows) - self.row_index)):
                 row = self._get_row()
                 if row is None:
                     break

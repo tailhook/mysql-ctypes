@@ -40,17 +40,17 @@ class TestCursor(BaseMySQLTests):
     def test_iterable(self, connection):
         with self.create_table(connection, "users", uid="INT"):
             with contextlib.closing(connection.cursor()) as cur:
-                cur.executemany("INSERT INTO users (uid) VALUES (%s)", [(i,) for i in xrange(5)])
+                cur.executemany("INSERT INTO users (uid) VALUES (%s)", [(i,) for i in range(5)])
                 cur.execute("SELECT * FROM users")
                 x = iter(cur)
                 row = cur.fetchone()
                 assert row == (0,)
-                row = x.next()
+                row = next(x)
                 assert row == (1,)
                 rows = cur.fetchall()
                 assert rows == [(2,), (3,), (4,)]
                 with py.test.raises(StopIteration):
-                    x.next()
+                    next(x)
 
     def test_lastrowid(self, connection):
         with self.create_table(connection, "users", uid="INT NOT NULL AUTO_INCREMENT", primary_key="uid"):
@@ -61,7 +61,7 @@ class TestCursor(BaseMySQLTests):
     def test_autocommit(self, connection):
         with self.create_table(connection, "users", uid="INT"):
             with contextlib.closing(connection.cursor()) as cur:
-                cur.executemany("INSERT INTO users (uid) VALUES (%s)", [(i,) for i in xrange(5)])
+                cur.executemany("INSERT INTO users (uid) VALUES (%s)", [(i,) for i in range(5)])
                 connection.rollback()
                 cur.execute("SELECT COUNT(*) FROM users")
                 c, = cur.fetchall()
@@ -109,18 +109,18 @@ class TestCursor(BaseMySQLTests):
                 assert r == (datetime.timedelta(hours=12, minutes=20, seconds=2),)
 
     def test_binary(self, connection):
-        self.assert_roundtrips(connection, "".join(chr(x) for x in xrange(255)))
+        self.assert_roundtrips(connection, "".join(chr(x) for x in range(255)))
         self.assert_roundtrips(connection, 'm\xf2\r\n')
 
     def test_blob(self, connection):
         with self.create_table(connection, "people", name="BLOB"):
             with contextlib.closing(connection.cursor()) as cur:
-                cur.execute("INSERT INTO people (name) VALUES (%s)", ("".join(chr(x) for x in xrange(255)),))
+                cur.execute("INSERT INTO people (name) VALUES (%s)", (bytes(x for x in range(255)),))
                 cur.execute("SELECT * FROM people")
                 row, = cur.fetchall()
                 val, = row
-                assert val == "".join(chr(x) for x in xrange(255))
-                assert type(val) is str
+                assert val == bytes(x for x in range(255)), val
+                assert type(val) is bytes
 
     def test_nonexistant_table(self, connection):
         with contextlib.closing(connection.cursor()) as cur:
@@ -137,7 +137,7 @@ class TestCursor(BaseMySQLTests):
                 cur.execute("DELETE FROM people WHERE age = %s", (10,))
                 assert cur.rowcount == 0
 
-                cur.executemany("INSERT INTO people (age) VALUES (%s)", [(i,) for i in xrange(5)])
+                cur.executemany("INSERT INTO people (age) VALUES (%s)", [(i,) for i in range(5)])
                 cur.execute("DELETE FROM people WHERE age < %s", (3,))
                 assert cur.rowcount == 3
 
@@ -182,7 +182,7 @@ class TestCursor(BaseMySQLTests):
 
                 cursor.execute("SELECT uid FROM people")
                 assert len(cursor.description) == 1
-                assert cursor.description[0][0] == "uid"
+                assert cursor.description[0][0] == b"uid"
 
     def test_executemany_return(self, connection):
         with self.create_table(connection, "people", uid="INT"):
@@ -193,9 +193,9 @@ class TestCursor(BaseMySQLTests):
     def test_unicode(self, connection):
         with self.create_table(connection, "snippets", content="TEXT"):
             with contextlib.closing(connection.cursor()) as cursor:
-                unicodedata = (u"Alors vous imaginez ma surprise, au lever du "
-                    u"jour, quand une drôle de petite voix m’a réveillé. Elle "
-                    u"disait: « S’il vous plaît… dessine-moi un mouton! »")
+                unicodedata = ("Alors vous imaginez ma surprise, au lever du "
+                    "jour, quand une drôle de petite voix m’a réveillé. Elle "
+                    "disait: « S’il vous plaît… dessine-moi un mouton! »")
                 cursor.executemany("INSERT INTO snippets (content) VALUES (%s)", [
                     (unicodedata.encode("utf-8"),),
                     (unicodedata.encode("utf-8"),),
@@ -204,7 +204,7 @@ class TestCursor(BaseMySQLTests):
                 r, = cursor.fetchall()
                 v, = r
                 v = v.decode("utf-8")
-                assert isinstance(v, unicode)
+                assert isinstance(v, str)
                 assert v == unicodedata
 
 
@@ -220,7 +220,7 @@ class TestDictCursor(BaseMySQLTests):
     def test_fetchmany(self, connection):
         with self.create_table(connection, "users", uid="INT"):
             with contextlib.closing(connection.cursor(DictCursor)) as cur:
-                cur.executemany("INSERT INTO users (uid) VALUES (%s)", [(i,) for i in xrange(10)])
+                cur.executemany("INSERT INTO users (uid) VALUES (%s)", [(i,) for i in range(10)])
                 cur.execute("SELECT * FROM users")
                 rows = cur.fetchmany()
                 assert rows == [{"uid": 0}]

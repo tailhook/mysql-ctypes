@@ -9,11 +9,11 @@ def literal(value):
     return lambda conn, obj: value
 
 def unicode_to_quoted_sql(connection, obj):
-    return connection.string_literal(obj.encode(connection.character_set_name()))
+    return connection.string_literal(obj)
 
 def object_to_quoted_sql(connection, obj):
-    if hasattr(obj, "__unicode__"):
-        return unicode_to_quoted_sql(connection, unicode(obj))
+    if isinstance(obj, (str, bytes)):
+        return unicode_to_quoted_sql(connection, obj)
     return connection.string_literal(str(obj))
 
 def fallback_encoder(obj):
@@ -29,7 +29,8 @@ _simple_field_encoders = {
     type(None): lambda connection, obj: "NULL",
     int: literal_encoder,
     bool: lambda connection, obj: str(int(obj)),
-    unicode: unicode_to_quoted_sql,
+    str: unicode_to_quoted_sql,
+    bytes: unicode_to_quoted_sql,
     datetime: datetime_encoder,
 }
 
@@ -43,32 +44,35 @@ DEFAULT_ENCODERS = [
 
 
 def datetime_decoder(value):
-    date_part, time_part = value.split(" ", 1)
+    date_part, time_part = value.split(b" ", 1)
     return datetime.combine(
         date_decoder(date_part),
-        time(*[int(part) for part in time_part.split(":")])
+        time(*[int(part) for part in time_part.split(b":")])
     )
 
 def date_decoder(value):
-    return date(*[int(part) for part in value.split("-")])
+    return date(*[int(part) for part in value.split(b"-")])
 
 def time_decoder(value):
     # MySQLdb returns a timedelta here, immitate this nonsense.
-    hours, minutes, seconds = value.split(":")
+    hours, minutes, seconds = value.split(b":")
     td = timedelta(
         hours = int(hours),
         minutes = int(minutes),
         seconds = int(seconds),
         microseconds = int(math.modf(float(seconds))[0]*1000000),
     )
-    if hours < 0:
+    if hours[0] == '-':
         td = -td
     return td
 
 def timestamp_decoder(value):
-    if " " in value:
+    if b" " in value:
         return datetime_decoder(value)
     raise NotImplementedError
+
+def decode(val):
+    return val.decode('utf-8')
 
 _simple_field_decoders = {
     field_types.TINY: int,
@@ -83,9 +87,9 @@ _simple_field_decoders = {
     field_types.DECIMAL: Decimal,
     field_types.NEWDECIMAL: Decimal,
 
-    field_types.BLOB: str,
-    field_types.VAR_STRING: str,
-    field_types.STRING: str,
+    field_types.BLOB: bytes,
+    field_types.VAR_STRING: decode,
+    field_types.STRING: decode,
 
     field_types.DATETIME: datetime_decoder,
     field_types.DATE: date_decoder,

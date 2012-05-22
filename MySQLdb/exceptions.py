@@ -1,7 +1,7 @@
-class Warning(StandardError):
+class Warning(Exception):
     pass
 
-class Error(StandardError):
+class Error(Exception):
     pass
 class InterfaceError(Error):
     pass

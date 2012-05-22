@@ -10,7 +10,7 @@ class BaseMySQLTests(object):
             # in arbitrary order, you have been warned.
             fields = ", ".join(
                 "%s %s" % (name, field_type)
-                for name, field_type in fields.iteritems()
+                for name, field_type in fields.items()
             )
             if pk is not None:
                 fields += ", PRIMARY KEY (%s)" % pk
